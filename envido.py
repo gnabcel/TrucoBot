@@ -39,8 +39,3 @@ def calculate_envido_points(cards):
             max_score = card.get_envido_value()
             
     return max_score
-
-print('testing')
-
-from card import Card
-print(calculate_envido_points([Card(1, Card.ESPADA), Card(2, Card.ORO), Card(3, Card.ESPADA)]))
