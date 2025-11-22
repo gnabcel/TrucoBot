@@ -1,54 +1,46 @@
-def extraerDatos(dato):
-    palo = dato[-1]  # Se extrae el primer caracter correspondiente a un palo
-    aux = dato.split(palo)
-    valor = int(aux[0])  # Se extra el valor del caracter
+def calculate_envido_points(cards):
+    if len(cards) != 3:
+        raise ValueError("Envido requires exactly 3 cards")
 
-    if (valor >= 10):  # En el envido las cartas de 10 para arriba suman cero
-        valor = 0
+    # Group by suit
+    suits = {}
+    for card in cards:
+        if card.suit not in suits:
+            suits[card.suit] = []
+        suits[card.suit].append(card)
 
-    return palo, valor
+    max_score = 0
 
+    # Check for Flor (3 cards of same suit) - simplified for now, usually Flor is a separate call
+    # But standard Envido rules say if you have 2 cards of same suit, you add 20 + their values.
+    
+    # Find suit with most cards
+    best_suit = None
+    max_count = 0
+    for suit, suit_cards in suits.items():
+        if len(suit_cards) > max_count:
+            max_count = len(suit_cards)
+            best_suit = suit
+    
+    if max_count >= 2:
+        # Calculate score for the 2 highest cards of that suit
+        suit_cards = sorted(suits[best_suit], key=lambda c: c.get_envido_value(), reverse=True)
+        # Take top 2
+        c1 = suit_cards[0]
+        c2 = suit_cards[1]
+        score = 20 + c1.get_envido_value() + c2.get_envido_value()
+        if score > max_score:
+            max_score = score
+    
+    # Also check individual cards (if no 2 cards of same suit, or if individual card is somehow better - rare but possible if 0 matches)
+    # Actually, if no matches, it's just the highest single card
+    for card in cards:
+        if card.get_envido_value() > max_score:
+            max_score = card.get_envido_value()
+            
+    return max_score
 
-def contarEnvido(carta1, carta2, carta3):
-    palo1, aux1 = extraerDatos(carta1)
-    palo2, aux2 = extraerDatos(carta2)
-    palo3, aux3 = extraerDatos(carta3)
+print('testing')
 
-    if ((palo1 == palo2) and (palo2 == palo3)):
-        # print("Flor")       # Flor significa que las 3 cartas son del mismo palo
-
-        suma = 20 + aux1 + aux2 + aux3
-
-        if suma > 33:  # La maxima suma que se puede realizar con la flor es 33
-            auxMax = max([aux1, aux2, aux3])
-            auxMin = min([aux1, aux2, aux3])
-
-            if ((aux1 > auxMin) and (aux1 < auxMax)): suma = 20 + aux1 + auxMax
-            if ((aux2 > auxMin) and (aux2 < auxMax)): suma = 20 + aux2 + auxMax
-            if ((aux3 > auxMin) and (aux3 < auxMax)): suma = 20 + aux3 + auxMax
-
-        texto = "FLOR. La suma de la flor es: " + str(suma)
-        # print("La suma de la flor es: {}".format(suma))
-
-    elif ((palo1 == palo2) and (palo2 != palo3)):
-        suma = 20 + aux1 + aux2
-        texto = "La suma del envido es: " + str(suma)
-        # print("La suma del envido es: {}".format(suma))
-
-    elif ((palo1 == palo3) and (palo1 != palo2)):
-        suma = 20 + aux1 + aux3
-        texto = "La suma del envido es: " + str(suma)
-        # print("La suma del envido es: {}".format(suma))
-
-    elif ((palo2 == palo3) and (palo1 != palo2)):
-        suma = 20 + aux2 + aux3
-        texto = "La suma del envido es: " + str(suma)
-        # print("La suma del envido es: {}".format(suma))
-
-    else:
-        # print("Mentiste. No tenias nada para el envido")
-        suma = max([aux1, aux2, aux3])
-        texto = "La suma del envido es: " + str(suma)
-        # print("La suma del envido es: {}".format(suma))
-
-    return texto
+from card import Card
+print(calculate_envido_points([Card(1, Card.ESPADA), Card(2, Card.ORO), Card(3, Card.ESPADA)]))
