@@ -41,13 +41,18 @@ class HeuristicBot(Player):
         if 'call_envido' in valid_actions and envido_points >= 28:
             return 'call_envido'
             
-        # 3. Answer Truco
+        # 3. Answer or call Truco/Retruco/Vale 4
         if 'truco_quiero' in valid_actions:
-            # Simple heuristic: accept if hand has a high card
+            # We must respond to a truco call.
             has_high_card = any(c.get_truco_value() >= 10 for c in self.hand)
             if has_high_card or random.random() < 0.3:
                 return 'truco_quiero'
             return 'truco_no_quiero'
+            
+        if 'call_retruco' in valid_actions and random.random() < 0.2:
+            return 'call_retruco'
+        if 'call_vale_4' in valid_actions and random.random() < 0.1:
+            return 'call_vale_4'
 
         # 4. Play Card
         card_actions = [a for a in valid_actions if a.startswith('play_card_')]

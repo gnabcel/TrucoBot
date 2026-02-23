@@ -19,10 +19,13 @@ def serve_static(path):
 @app.route('/api/start', methods=['POST'])
 def start_game():
     global game
+    data = request.json or {}
+    target = data.get('target_score', 30)
+    
     p1 = APIPlayer("Player")
     p2 = HeuristicBot("Bot")
-    game = TrucoGame(p1, p2)
-    return jsonify({"status": "started"})
+    game = TrucoGame(p1, p2, target_score=target)
+    return jsonify({"status": "started", "target": target})
 
 @app.route('/api/state', methods=['GET'])
 def get_state():
@@ -33,8 +36,10 @@ def get_state():
     state = game.get_state_for_player(game.p1)
     
     # Check if we need bot to play
-    if game.phase == GamePhase.PLAYING and game.current_turn == game.p2:
-        # Bot's turn
+    # Bot only plays if it is its turn AND we are NOT waiting for a human response
+    turn_ok = game.phase == GamePhase.PLAYING and game.current_turn == game.p2
+    
+    if turn_ok:
         bot_state = game.get_state_for_player(game.p2)
         action = game.p2.get_action(bot_state)
         

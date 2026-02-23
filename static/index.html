@@ -1,28 +1,51 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TrucoBot - Premium AI</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=4">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 </head>
+
 <body>
     <div id="game-container">
+        <!-- Start Menu Overlay -->
+        <div id="start-menu-overlay">
+            <h1 class="bounce-title">TrucoBot AI</h1>
+            <p>¿A cuántos puntos querés jugar?</p>
+            <div class="menu-buttons">
+                <button class="primary-btn" onclick="startGame(15)">Jugar a 15 (Malas)</button>
+                <button class="primary-btn" onclick="startGame(30)">Jugar a 30 (Buenas)</button>
+            </div>
+        </div>
+
         <!-- Overlay for Game Over -->
         <div id="game-over-overlay" class="hidden">
             <h1 id="game-over-title">You Win!</h1>
             <p>Score: <span id="final-score">30 - 25</span></p>
-            <button class="primary-btn" onclick="startGame()">Play Again</button>
+            <button class="primary-btn" onclick="location.reload()">Menu Principal</button>
+        </div>
+
+        <!-- Round Summary Overlay -->
+        <div id="round-summary-overlay" class="hidden">
+            <h2>Fin de la Mano</h2>
+            <div id="round-summary-text"></div>
+            <button class="secondary-btn" onclick="closeRoundSummary()">Continuar</button>
         </div>
 
         <!-- Main Board -->
         <div id="board">
-            
+
             <!-- Opponent Area -->
             <div class="player-area opponent">
                 <div class="player-info">
-                    <div class="avatar">🤖</div>
+                    <div class="avatar-container">
+                        <div class="avatar">🤖</div>
+                        <div class="speech-bubble" id="opp-speech">Hola!</div>
+                    </div>
                     <div class="details">
                         <h2>TrucoBot</h2>
                         <div class="score">Score: <span id="opp-score">0</span></div>
@@ -41,6 +64,12 @@
                     <div id="round-indicator">Round 1</div>
                 </div>
                 <div class="played-area" id="my-played"></div>
+
+                <!-- History Log Positioned absolute or flex inside table center or board -->
+                <div id="game-log">
+                    <h3>Historial</h3>
+                    <div id="log-messages"></div>
+                </div>
             </div>
 
             <!-- Player Area -->
@@ -49,7 +78,10 @@
                     <!-- Cards injected by JS -->
                 </div>
                 <div class="player-info">
-                    <div class="avatar">😎</div>
+                    <div class="avatar-container">
+                        <div class="avatar">😎</div>
+                        <div class="speech-bubble" id="my-speech">Vamos!</div>
+                    </div>
                     <div class="details">
                         <h2>You</h2>
                         <div class="score">Score: <span id="my-score">0</span></div>
@@ -61,13 +93,13 @@
 
         <!-- Controls Panel -->
         <div id="controls-panel">
-            <div id="status-message">Waiting for game to start...</div>
+            <div id="status-message">Eligiendo opciones...</div>
             <div id="action-buttons">
-                <button class="primary-btn" onclick="startGame()">Start Game</button>
             </div>
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <script src="app.js?v=4"></script>
 </body>
+
 </html>

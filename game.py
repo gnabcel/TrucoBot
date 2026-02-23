@@ -2,6 +2,8 @@ from deck import Deck
 from envido import calculate_envido_points, EnvidoState, EnvidoResponse, get_quiero_points, get_no_quiero_points
 from truco import TrucoState, get_truco_points, get_next_truco_state
 
+import random
+
 class GamePhase:
     DEALING = "dealing"
     PLAYING = "playing"
@@ -9,16 +11,20 @@ class GamePhase:
     GAME_OVER = "game_over"
 
 class TrucoGame:
-    def __init__(self, p1, p2):
+    def __init__(self, p1, p2, target_score=30):
         self.p1 = p1
         self.p2 = p2
         self.deck = Deck()
         self.p1_score = 0
         self.p2_score = 0
-        self.target_score = 30
+        self.target_score = target_score
         self.hand_number = 0
+        self.log = []
         
         self.reset_round()
+        
+    def add_log(self, msg):
+        self.log.append(msg)
         
     def reset_round(self):
         self.phase = GamePhase.DEALING
@@ -33,15 +39,20 @@ class TrucoGame:
         
         self.envido_state = EnvidoState.NOT_CALLED
         self.envido_history = []
+        self.envido_played = False
         self.envido_points_p1 = 0
         self.envido_points_p2 = 0
         self.envido_winner = None
         
         self.truco_state = TrucoState.NOT_CALLED
         self.truco_owner = None # Who called it last (other person must accept/raise)
+        self.truco_turn = None # Who can RAISE the truco
         
         self.waiting_for_response = None # 'envido' or 'truco'
         self.cards_played_this_turn = []
+        
+        self.add_log(f"--- Arranca la Mano {self.hand_number + 1} ---")
+        self.add_log(f"Reparte: {'Vos' if self.current_turn != self.p1 else 'TrucoBot'}")
         
         self.deal()
         
@@ -76,7 +87,9 @@ class TrucoGame:
             "my_envido": self.envido_points_p1 if player == self.p1 else self.envido_points_p2,
             "hand_number": self.hand_number,
             "round_winners": self.round_winners,
-            "waiting_for_response": self.waiting_for_response
+            "waiting_for_response": self.waiting_for_response,
+            "log": self.log,
+            "truco_turn": 1 if self.truco_turn == self.p1 else (2 if self.truco_turn == self.p2 else None)
         }
         
     def get_valid_actions(self, player):
@@ -108,16 +121,21 @@ class TrucoGame:
             
         # Call Envido (only if first round and no cards played by this player)
         has_played = (len(self.played_cards_p1) > 0 if player == self.p1 else len(self.played_cards_p2) > 0)
-        if len(self.round_winners) == 0 and not has_played and self.envido_state == EnvidoState.NOT_CALLED:
+        # Fix: envido_played tracking stops multiple envido calls if it already passed.
+        if len(self.round_winners) == 0 and not has_played and self.envido_state == EnvidoState.NOT_CALLED and not self.envido_played and self.truco_state == TrucoState.NOT_CALLED:
             actions.extend(['call_envido', 'call_real_envido', 'call_falta_envido'])
             
-        # Call Truco
+        # Call Truco (Sequence: Nada -> Truco -> Retruco -> Vale 4)
         if self.truco_state == TrucoState.NOT_CALLED:
             actions.append('call_truco')
-        elif self.truco_owner != player:
+        elif self.truco_turn == player:
             next_state = get_next_truco_state(self.truco_state)
             if next_state:
                 actions.append(f'call_{next_state}')
+                
+        # Make sure that playing a card is ONLY allowed if 'truco' isn't waiting
+        if self.waiting_for_response == 'truco':
+            actions = [a for a in actions if not a.startswith('play_card_')]
                 
         return actions
 
@@ -128,8 +146,24 @@ class TrucoGame:
         if action not in self.get_valid_actions(player):
             return False, f"Invalid action {action}"
 
+        name = "Vos" if player == self.p1 else "TrucoBot"
+
+        # Flavor text helpers
+        quiero_envido_phrases = ["¡Quiero!", "¡Se la rre banca, quiero!", "¡Quiero y retruco no... mentira, quiero!", "Venga ese envido."]
+        no_quiero_envido_phrases = ["No quiero.", "Paso.", "Son buenas, me achico.", "No me da el cuero, no quiero."]
+        quiero_truco_phrases = ["¡Quiero!", "¡Vení que me la banco!", "A ver si sos tan guapo, ¡quiero!", "Dale, quiero."]
+        no_quiero_truco_phrases = ["Me voy al mazo.", "Te la dejo.", "No tengo nada, me chicho.", "Buen truco, me achico."]
+        
+        # Determine specific phrase for Bot vs Player
+        def get_phrase(phrases_list, is_bot):
+            return random.choice(phrases_list) if is_bot else phrases_list[0]
+
+        is_bot = player == self.p2
+
         # Handle Responses
         if action == 'envido_quiero':
+            phrase = get_phrase(quiero_envido_phrases, is_bot)
+            self.add_log(f"{name}: {phrase}")
             self.resolve_envido(accepted=True)
             self.waiting_for_response = None
             self.current_turn = self.get_opponent(player) # Return turn to whoever called it (simplified)
@@ -138,32 +172,67 @@ class TrucoGame:
             return True, "Envido accepted"
             
         elif action == 'envido_no_quiero':
+            phrase = get_phrase(no_quiero_envido_phrases, is_bot)
+            self.add_log(f"{name}: {phrase}")
             self.resolve_envido(accepted=False)
             self.waiting_for_response = None
             self.current_turn = self.get_opponent(player)
             return True, "Envido rejected"
             
-        elif action == 'truco_quiero':
+        elif action.startswith('truco_quiero'):
+            phrase = get_phrase(quiero_truco_phrases, is_bot)
+            next_state = get_next_truco_state(self.truco_state)
+            
+            self.add_log(f"{name}: {phrase}")
+            if next_state == TrucoState.VALE_4 and self.truco_state == TrucoState.RETRUCO:
+                 self.truco_state = TrucoState.VALE_4 # accepted vale 4
+                 self.truco_turn = None # nobody can raise anymore
+            elif self.truco_state == TrucoState.RETRUCO:
+                 # It was recently raised TO retruco, so we are accepting retruco
+                 # The 'truco_state' is already RETRUCO from the call. 
+                 # We just confirm it.
+                 pass
+            elif self.truco_state == TrucoState.TRUCO:
+                 pass
+                 
+            self.truco_turn = self.get_opponent(player) # The one who didn't accept gets the turn to raise
             self.waiting_for_response = None
             self.current_turn = self.get_opponent(player)
             return True, "Truco accepted"
             
         elif action == 'truco_no_quiero':
+            phrase = get_phrase(no_quiero_truco_phrases, is_bot)
+            self.add_log(f"{name}: {phrase}")
             self.resolve_truco_rejection(player)
             return True, "Truco rejected"
 
         # Handle Calls
         if action.startswith('call_'):
             call_type = action[len('call_'):]
+            call_names = {
+                'envido': '¡Envido!', 'real_envido': '¡Real Envido!', 'falta_envido': '¡Falta Envido carajo!',
+                'truco': '¡Truco!', 'retruco': '¡Quiero Retruco!', 'vale_4': '¡Quiero Vale Cuatro!'
+            }
+            cname = call_names.get(call_type, call_type)
+            # Flavor variation for bot
+            if is_bot and call_type == 'truco':
+                cname = random.choice(["¡Truco!", "Jugá que te canto Truco.", "Te veo flojo... ¡Truco!"])
+            elif is_bot and call_type == 'envido':
+                cname = random.choice(["¡Envido!", "Tengo puntitos... ¡Envido!", "Canto Envido."])
+                
+            self.add_log(f"{name}: {cname}")
+            
             if call_type in ['envido', 'real_envido', 'falta_envido']:
                 self.envido_state = call_type
                 self.envido_history.append(call_type)
+                self.envido_played = True
                 self.waiting_for_response = 'envido'
                 self.current_turn = self.get_opponent(player)
                 return True, f"Called {call_type}"
             elif call_type in ['truco', 'retruco', 'vale_4']:
-                self.truco_state = call_type
-                self.truco_owner = player
+                self.truco_state = call_type # state becomes the call immediately
+                self.truco_owner = player # only owner can be rejected
+                self.truco_turn = None # nobody can raise while waiting
                 self.waiting_for_response = 'truco'
                 self.current_turn = self.get_opponent(player)
                 return True, f"Called {call_type}"
@@ -178,6 +247,8 @@ class TrucoGame:
                 self.played_cards_p1.append(card)
             else:
                 self.played_cards_p2.append(card)
+                
+            self.add_log(f"{name} juega: {card}")
                 
             # If both have played, resolve the trick
             if len(self.cards_played_this_turn) == 2:
@@ -198,27 +269,35 @@ class TrucoGame:
             # In tie, player who is "Mano" (P1 if hand_number is even) wins
             is_p1_mano = (self.hand_number % 2 == 0)
             
+            self.add_log(f"Puntos de Envido: Vos ({self.envido_points_p1}) vs TrucoBot ({self.envido_points_p2})")
+            
             if self.envido_points_p1 > self.envido_points_p2:
                 self.p1_score += pts
                 self.envido_winner = self.p1
+                self.add_log(f"Vos ganás {pts} puntos de Envido.")
             elif self.envido_points_p2 > self.envido_points_p1:
                 self.p2_score += pts
                 self.envido_winner = self.p2
+                self.add_log(f"TrucoBot gana {pts} puntos de Envido.")
             else:
                 if is_p1_mano:
                     self.p1_score += pts
                     self.envido_winner = self.p1
+                    self.add_log(f"Empate. Vos sos mano y ganás {pts} puntos.")
                 else:
                     self.p2_score += pts
                     self.envido_winner = self.p2
+                    self.add_log(f"Empate. TrucoBot es mano y gana {pts} puntos.")
         else:
             # simple for now
             pts = get_no_quiero_points(self.envido_state)
             opp = self.get_opponent(self.current_turn)
             if opp == self.p1:
                 self.p1_score += pts
+                self.add_log(f"Vos ganás {pts} puntos porque TrucoBot no quiso.")
             else:
                 self.p2_score += pts
+                self.add_log(f"TrucoBot gana {pts} puntos porque no quisiste.")
                 
         self.check_game_over()
 
@@ -258,8 +337,12 @@ class TrucoGame:
             
         if trick_winner == self.p1:
             winner_id = 1
+            self.add_log("-> Vos ganás la baza.")
         elif trick_winner == self.p2:
             winner_id = 2
+            self.add_log("-> TrucoBot gana la baza.")
+        else:
+            self.add_log("-> ¡Parda! (Empate)")
             
         self.round_winners.append(winner_id)
         self.cards_played_this_turn = []
@@ -305,8 +388,10 @@ class TrucoGame:
         if round_over:
             pts = get_truco_points(self.truco_state)
             if winner == self.p1:
+                self.add_log(f"¡Vos ganás la mano! Sumás {pts} puntos.")
                 self.p1_score += pts
             else:
+                self.add_log(f"TrucoBot gana la mano. Suma {pts} puntos.")
                 self.p2_score += pts
             self.end_round()
 
@@ -319,5 +404,9 @@ class TrucoGame:
     def check_game_over(self):
         if self.p1_score >= self.target_score or self.p2_score >= self.target_score:
             self.phase = GamePhase.GAME_OVER
+            if self.p1_score >= self.target_score:
+                self.add_log("¡Ganaste la partida!")
+            else:
+                self.add_log("TrucoBot ganó la partida.")
             return True
         return False
