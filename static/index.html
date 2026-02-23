@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TrucoBot - Premium AI</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="game-container">
+        <!-- Overlay for Game Over -->
+        <div id="game-over-overlay" class="hidden">
+            <h1 id="game-over-title">You Win!</h1>
+            <p>Score: <span id="final-score">30 - 25</span></p>
+            <button class="primary-btn" onclick="startGame()">Play Again</button>
+        </div>
+
+        <!-- Main Board -->
+        <div id="board">
+            
+            <!-- Opponent Area -->
+            <div class="player-area opponent">
+                <div class="player-info">
+                    <div class="avatar">🤖</div>
+                    <div class="details">
+                        <h2>TrucoBot</h2>
+                        <div class="score">Score: <span id="opp-score">0</span></div>
+                    </div>
+                </div>
+                <div class="cards-hand" id="opp-hand">
+                    <!-- Cards injected by JS -->
+                </div>
+            </div>
+
+            <!-- Table Center -->
+            <div id="table-center">
+                <div class="played-area" id="opp-played"></div>
+                <div class="deck-area">
+                    <div class="deck-deck">Mazo</div>
+                    <div id="round-indicator">Round 1</div>
+                </div>
+                <div class="played-area" id="my-played"></div>
+            </div>
+
+            <!-- Player Area -->
+            <div class="player-area you">
+                <div class="cards-hand" id="my-hand">
+                    <!-- Cards injected by JS -->
+                </div>
+                <div class="player-info">
+                    <div class="avatar">😎</div>
+                    <div class="details">
+                        <h2>You</h2>
+                        <div class="score">Score: <span id="my-score">0</span></div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Controls Panel -->
+        <div id="controls-panel">
+            <div id="status-message">Waiting for game to start...</div>
+            <div id="action-buttons">
+                <button class="primary-btn" onclick="startGame()">Start Game</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

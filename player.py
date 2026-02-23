@@ -1,63 +1,72 @@
-from abc import ABC, abstractmethod
 import random
 
-class Player(ABC):
+class Player:
     def __init__(self, name):
         self.name = name
         self.hand = []
         self.score = 0
+        self.played_cards = []
 
     def receive_cards(self, cards):
         self.hand = cards
+        self.played_cards = []
 
-    @abstractmethod
-    def play_card(self, played_cards_in_round):
-        pass
+    def play_card(self, card_index):
+        if 0 <= card_index < len(self.hand):
+            card = self.hand.pop(card_index)
+            self.played_cards.append(card)
+            return card
+        return None
 
-    @abstractmethod
-    def call_envido(self, game_score_self, game_score_opponent):
-        pass
-    
-    @abstractmethod
-    def call_truco(self, game_score_self, game_score_opponent):
-        pass
+class APIPlayer(Player):
+    # API Player doesn't make automatic decisions, it waits for inputs from the Web UI.
+    pass
 
-class RandomBot(Player):
-    def play_card(self, played_cards_in_round):
-        if not self.hand:
-            return None
-        # Simple random choice for now
-        card_index = random.randint(0, len(self.hand) - 1)
-        return self.hand.pop(card_index)
-
-    def call_envido(self, game_score_self, game_score_opponent):
-        # Randomly call envido 10% of the time if not already called
-        return random.random() < 0.1
-
-    def call_truco(self, game_score_self, game_score_opponent):
-        # Randomly call truco 10% of the time
-        return random.random() < 0.1
-
-class HumanPlayer(Player):
-    def play_card(self, played_cards_in_round):
-        print(f"\n{self.name}'s hand:")
-        for i, card in enumerate(self.hand):
-            print(f"{i}: {card}")
+class HeuristicBot(Player):
+    def get_action(self, game_state):
+        # Determine valid actions from game state
+        valid_actions = game_state.get('valid_actions', [])
         
-        while True:
-            try:
-                choice = int(input("Choose a card to play (index): "))
-                if 0 <= choice < len(self.hand):
-                    return self.hand.pop(choice)
-                else:
-                    print("Invalid index.")
-            except ValueError:
-                print("Please enter a number.")
+        # Helper rules
+        envido_points = game_state.get('my_envido', 0)
+        
+        # 1. Answer Envido
+        if 'envido_quiero' in valid_actions:
+            if envido_points >= 26:
+                return 'envido_quiero'
+            else:
+                return 'envido_no_quiero'
+                
+        # 2. Call Envido?
+        if 'call_envido' in valid_actions and envido_points >= 28:
+            return 'call_envido'
+            
+        # 3. Answer Truco
+        if 'truco_quiero' in valid_actions:
+            # Simple heuristic: accept if hand has a high card
+            has_high_card = any(c.get_truco_value() >= 10 for c in self.hand)
+            if has_high_card or random.random() < 0.3:
+                return 'truco_quiero'
+            return 'truco_no_quiero'
 
-    def call_envido(self, game_score_self, game_score_opponent):
-        choice = input("Call Envido? (y/n): ").lower()
-        return choice == 'y'
-
-    def call_truco(self, game_score_self, game_score_opponent):
-        choice = input("Call Truco? (y/n): ").lower()
-        return choice == 'y'
+        # 4. Play Card
+        card_actions = [a for a in valid_actions if a.startswith('play_card_')]
+        if card_actions:
+            # Play highest card if we are losing the round or it's the first round
+            # Just simple for now: play largest card
+            best_idx = 0
+            best_val = -1
+            for i, c in enumerate(self.hand):
+                if c.get_truco_value() > best_val:
+                    best_val = c.get_truco_value()
+                    best_idx = i
+            # Or mix it up
+            if random.random() < 0.2:
+                best_idx = random.randint(0, len(self.hand)-1)
+                
+            return f'play_card_{best_idx}'
+            
+        # Fallback random action
+        if valid_actions:
+            return random.choice(valid_actions)
+        return None
